@@ -1,86 +1,70 @@
 import time
 import requests
 from bs4 import BeautifulSoup
-
-# URL do site de jogos ao vivo
-url = 'https://www.placardefutebol.com.br/jogos-em-andamento'
-response = requests.get(url)
-soup = BeautifulSoup(response.content, 'html.parser')
+from envio_telegram import *
 
 
-# headers = {
-#     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
-# }
-# print(soup.find_all('h5', class_="text-right team_link")) 
-# title = soup.find_all('h3', class_="match-list_league-name")
-# time_casa = soup.find_all('h5', class_="text-right team_link")
-# jogos = soup.find_all('div', id='livescore')
-# for tag in jogos:
-#     time_casa = soup.find_all('h5', class_="text-right team_link")
-    # time_visitante = soup.find_all('h5', class_="text-left team_link")     
-    # result_casa = soup.find_all('div', class_='w-25 p-1 match-score d-flex justify-content-start')
-    # result_visitante = soup.find_all('div', class_='w-25 p-1 match-score d-flex justify-content-end')
+# Função para buscar os dados dos jogos
+def buscar_dados_jogos():
+    url = 'https://www.placardefutebol.com.br/jogos-em-andamento'
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    jogos = []
+
+    # Faz a pesquisa uma vez e usa as variáveis para armazenar as listas corretas
+    tempos = soup.find_all('span', class_='badge badge-success status-name blink')
+    times_casa = soup.find_all('h5', class_="text-right team_link")
+    times_fora = soup.find_all('h5', class_='text-left team_link')
+    resultados_casa = soup.find_all('div', class_="w-25 p-1 match-score d-flex justify-content-end")
+    resultados_fora = soup.find_all('div', class_="w-25 p-1 match-score d-flex justify-content-start")
+
+    for i in range(len(tempos)):
+        tempo = tempos[i].get_text().strip()
+        time_casa = times_casa[i].get_text().strip()
+        time_fora = times_fora[i].get_text().strip()
+        resultado_casa = resultados_casa[i].get_text().strip()
+        resultado_fora = resultados_fora[i].get_text().strip()
+
+        jogos.append({
+            'tempo': tempo,
+            'time_casa': time_casa,
+            'time_fora': time_fora,
+            'resultado_casa': resultado_casa,
+            'resultado_fora': resultado_fora
+        })
     
-# return [tag[time_casa]]
+    return jogos
 
-
-# title = soup.find('div', class_="row linhaPartida")
-
-# tempo= []
-# time_casa = []
-# time_fora = []
-# result_casa = []
-# result_fora = []
-
-# for x in soup.find_all('div', id="livescore"):
-#     tempo = soup.find_all('span', class_='badge badge-success status-name blink')
-#     for t in tempo:
-#         tempo.append(t)
-#         print(t.get_text())
-#     time_casa = soup.find_all('h5', class_="text-right team_link")
-#     for time in time_casa:
-#         print(time.get_text())
-#     time_fora = soup.find_all('h5', class_='text-left team_link')
-#     for fora in time_fora:
-#         print(fora.get_text())
-#     result_casa = soup.find_all('span', class_="badge badge-default")
-#     for result_c in result_casa:
-#         print(result_c.get_text())
-#     result_fora = soup.find_all('span', class_='badge badge-default')
-#     for result_f in result_fora:
-#         print(result_f.get_text())
+# Função para comparar os jogos e verificar se houve gol
+def verificar_mudanca(jogos_anteriores, jogos_atualizados):
+    mudancas = []
     
-#     mensagem_final += f"{tempo.get_text()} {result_c.get_text()} x {result_f.get_text()} {fora.get_text()} \n"
+    for i in range(len(jogos_atualizados)):
+        jogo_anterior = jogos_anteriores[i]
+        jogo_atual = jogos_atualizados[i]
+        
+        if jogo_anterior['resultado_casa'] != jogo_atual['resultado_casa'] or jogo_anterior['resultado_fora'] != jogo_atual['resultado_fora']:
+            mudancas.append(jogo_atual)
+    
+    return mudancas
 
-# print(mensagem_final)
+# Loop principal
+jogos_anteriores = buscar_dados_jogos()
 
-mensagem_final = ""
-
-# Faz a pesquisa uma vez e usa as variáveis para armazenar as listas corretas
-tempos = soup.find_all('span', class_='badge badge-success status-name blink')
-times_casa = soup.find_all('h5', class_="text-right team_link")
-times_fora = soup.find_all('h5', class_='text-left team_link')
-resultados_casa = soup.find_all('div', class_="w-25 p-1 match-score d-flex justify-content-end")
-resultados_fora = soup.find_all('div', class_="w-25 p-1 match-score d-flex justify-content-start")
-
-# Itera sobre as partidas encontradas
-for i in range(len(tempos)):
-            tempo = tempos[i].get_text().strip()
-            time_casa = times_casa[i].get_text()  # Pega o nome do time da casa
-            time_fora = times_fora[i].get_text()  # Pega o nome do time de fora
-            resultado_casa = resultados_casa[i].get_text().strip()  # Pega o placar da casa
-            resultado_fora = resultados_fora[i].get_text().strip() # Pega o placar do visitante
-
-            penaltis_casa = resultados_casa[i].find('span', class_='badge badge-penalties')
-            penaltis_fora = resultados_fora[i].find('span', class_='badge badge-penalties')
-
-            if penaltis_casa and penaltis_fora:
-                    resultado_casa = penaltis_casa.get_text().strip()
-                    resultado_fora = penaltis_fora.get_text().strip()
-
-
-            # Concatena as informações na mensagem final
-            mensagem_final += f"{tempo} {time_casa} {resultado_casa} x {resultado_fora} {time_fora}\n"
-
-# Exibe a mensagem final
-print(mensagem_final)
+while True:
+    time.sleep(20)  # Aguardar 20 segundos antes de verificar novamente
+    jogos_atualizados = buscar_dados_jogos()
+    
+    mudancas = verificar_mudanca(jogos_anteriores, jogos_atualizados)
+    
+    if mudancas:
+        mensagem_final = ""
+        for jogo in mudancas:
+            mensagem_final += f"⚽ {jogo['tempo']} {jogo['time_casa']} {jogo['resultado_casa']} x {jogo['resultado_fora']} {jogo['time_fora']}\n"
+        
+        print(mensagem_final)  # Aqui você poderia enviar a mensagem via Telegram ou outro canal de notificação
+        response = send_message(token, chat_id, mensagem_final)
+        print(response)
+    # Atualizar o estado anterior dos jogos
+    jogos_anteriores = jogos_atualizados
